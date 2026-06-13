@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PortalShell } from "@/components/hostel/portal-shell";
 import { Card, Section } from "@/components/hostel/primitives";
 import { StatusChip, statusTone, prettyStatus } from "@/components/hostel/status-chip";
-import { bills } from "@/lib/hostel-data";
+import { useBills } from "@/lib/data-layer";
 
 export const Route = createFileRoute("/student/billing")({
   head: () => ({ meta: [{ title: "Billing — Bunkhaus" }] }),
@@ -10,8 +10,20 @@ export const Route = createFileRoute("/student/billing")({
 });
 
 function BillingPage() {
+  const { data: bills, isLoading } = useBills();
+
+  if (isLoading || !bills) {
+    return (
+      <PortalShell role="student" eyebrow="Ledger" title="Billing">
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading billing ledger...</div>
+        </div>
+      </PortalShell>
+    );
+  }
+
   const outstanding = bills.filter((b) => b.status !== "paid").reduce((s, b) => s + b.total, 0);
-  const current = bills[0];
+  const current = bills[0] || { total: 0, dueDate: "N/A", status: "paid", period: "N/A" };
 
   return (
     <PortalShell role="student" eyebrow="Ledger" title="Billing">

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PortalShell } from "@/components/hostel/portal-shell";
 import { Card, Section } from "@/components/hostel/primitives";
+import { useBills, useComplaints } from "@/lib/data-layer";
 
 export const Route = createFileRoute("/admin/analytics")({
   head: () => ({ meta: [{ title: "Admin · Analytics" }] }),
@@ -41,6 +42,28 @@ function Donut({ value }: { value: number }) {
 }
 
 function AnalyticsPage() {
+  const { data: bills, isLoading: bLoading } = useBills();
+  const { data: complaints, isLoading: cLoading } = useComplaints();
+
+  if (bLoading || cLoading || !bills || !complaints) {
+    return (
+      <PortalShell role="admin" eyebrow="Reports" title="Analytics">
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading analytics...</div>
+        </div>
+      </PortalShell>
+    );
+  }
+
+  const total = bills.reduce((s, b) => s + b.total, 0) || 1;
+  const paid = bills.filter((b) => b.status === "paid").reduce((s, b) => s + b.total, 0);
+  const due = bills.filter((b) => b.status === "due").reduce((s, b) => s + b.total, 0);
+  const overdue = bills.filter((b) => b.status === "overdue").reduce((s, b) => s + b.total, 0);
+
+  const pctPaid = Math.round((paid / total) * 100);
+  const pctDue = Math.round((due / total) * 100);
+  const pctOverdue = Math.round((overdue / total) * 100);
+
   return (
     <PortalShell role="admin" eyebrow="Reports" title="Analytics">
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
@@ -55,15 +78,15 @@ function AnalyticsPage() {
 
         <Section title="Collection rate">
           <Card className="flex items-center justify-between gap-4">
-            <Donut value={92} />
+            <Donut value={pctPaid} />
             <div className="text-sm">
               <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">June cycle</div>
-              <div className="font-display text-2xl tabular">₹3.88 cr</div>
+              <div className="font-display text-2xl tabular">₹{paid.toLocaleString()}</div>
               <div className="hairline my-3" />
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between gap-6"><span className="text-muted-foreground">Paid</span><span className="font-mono tabular">92.4%</span></div>
-                <div className="flex items-center justify-between gap-6"><span className="text-muted-foreground">Due</span><span className="font-mono tabular">6.4%</span></div>
-                <div className="flex items-center justify-between gap-6"><span className="text-muted-foreground">Overdue</span><span className="font-mono tabular text-[color:var(--danger)]">1.2%</span></div>
+                <div className="flex items-center justify-between gap-6"><span className="text-muted-foreground">Paid</span><span className="font-mono tabular">{pctPaid}%</span></div>
+                <div className="flex items-center justify-between gap-6"><span className="text-muted-foreground">Due</span><span className="font-mono tabular">{pctDue}%</span></div>
+                <div className="flex items-center justify-between gap-6"><span className="text-muted-foreground">Overdue</span><span className="font-mono tabular text-[color:var(--danger)]">{pctOverdue}%</span></div>
               </div>
             </div>
           </Card>

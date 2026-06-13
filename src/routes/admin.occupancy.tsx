@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PortalShell } from "@/components/hostel/portal-shell";
 import { Card, Section } from "@/components/hostel/primitives";
-import { rooms } from "@/lib/hostel-data";
+import { useRooms } from "@/lib/data-layer";
 
 export const Route = createFileRoute("/admin/occupancy")({
   head: () => ({ meta: [{ title: "Admin · Occupancy" }] }),
@@ -9,6 +9,18 @@ export const Route = createFileRoute("/admin/occupancy")({
 });
 
 function OccupancyPage() {
+  const { data: rooms, isLoading } = useRooms();
+
+  if (isLoading || !rooms) {
+    return (
+      <PortalShell role="admin" eyebrow="Residences" title="Occupancy">
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading occupancy...</div>
+        </div>
+      </PortalShell>
+    );
+  }
+
   const blocks = Array.from(new Set(rooms.map((r) => r.block)));
   return (
     <PortalShell role="admin" eyebrow="Residences" title="Occupancy">

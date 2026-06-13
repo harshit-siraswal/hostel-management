@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
 import { PortalShell } from "@/components/hostel/portal-shell";
 import { Card } from "@/components/hostel/primitives";
 import { StatusChip, statusTone, prettyStatus } from "@/components/hostel/status-chip";
-import { leaveRequests as seed, type LeaveRequest } from "@/lib/hostel-data";
+import { useLeaveRequests, useDecideLeaveRequest } from "@/lib/data-layer";
 
 export const Route = createFileRoute("/warden/leave")({
   head: () => ({ meta: [{ title: "Warden · Leave queue" }] }),
@@ -11,9 +10,22 @@ export const Route = createFileRoute("/warden/leave")({
 });
 
 function WardenLeave() {
-  const [list, setList] = useState<LeaveRequest[]>(seed);
-  const decide = (id: string, status: LeaveRequest["status"]) =>
-    setList((l) => l.map((x) => (x.id === id ? { ...x, status } : x)));
+  const { data: list, isLoading } = useLeaveRequests();
+  const decideLeave = useDecideLeaveRequest();
+
+  if (isLoading || !list) {
+    return (
+      <PortalShell role="warden" eyebrow="Approvals" title="Leave queue">
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading leave requests...</div>
+        </div>
+      </PortalShell>
+    );
+  }
+
+  const decide = (id: string, status: "approved" | "rejected") => {
+    decideLeave.mutate({ id, status });
+  };
 
   return (
     <PortalShell role="warden" eyebrow="Approvals" title="Leave queue">

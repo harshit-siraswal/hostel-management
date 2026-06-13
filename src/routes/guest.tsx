@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PortalShell } from "@/components/hostel/portal-shell";
 import { Card } from "@/components/hostel/primitives";
+import { VisitorQr } from "@/components/hostel/visitor-qr";
 import { StatusChip, statusTone, prettyStatus } from "@/components/hostel/status-chip";
-import { visitors } from "@/lib/hostel-data";
-import { Clock, MapPin, QrCode, ShieldCheck, User } from "lucide-react";
+import { useVisitors } from "@/lib/data-layer";
+import { Clock, MapPin, ShieldCheck, User } from "lucide-react";
 
 export const Route = createFileRoute("/guest")({
   head: () => ({ meta: [{ title: "Visitor Pass — Bunkhaus" }] }),
@@ -11,7 +12,19 @@ export const Route = createFileRoute("/guest")({
 });
 
 function GuestPortal() {
-  const pass = visitors[0]; // primary active pass for the demo guest
+  const { data: visitors, isLoading } = useVisitors();
+
+  if (isLoading || !visitors || visitors.length === 0) {
+    return (
+      <PortalShell role="guest" eyebrow="Visitor portal" title="Your gate pass">
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading visitor passes...</div>
+        </div>
+      </PortalShell>
+    );
+  }
+
+  const pass = visitors[0]; // primary active pass for the guest
   const history = visitors.slice(1);
 
   return (
@@ -37,9 +50,7 @@ function GuestPortal() {
               <Row icon={<MapPin className="h-4 w-4" />} label="Entry point" value="Main Gate · Block C lobby" />
               <Row icon={<ShieldCheck className="h-4 w-4" />} label="Verification" value="AI face-match · manual fallback allowed" />
             </div>
-            <div className="grid h-36 w-36 place-items-center rounded-lg border border-border bg-background/60">
-              <QrCode className="h-24 w-24 text-amber" />
-            </div>
+            <VisitorQr visitor={pass} size={144} caption="Scan-ready visitor QR" />
           </div>
 
           <div className="hairline my-6" />

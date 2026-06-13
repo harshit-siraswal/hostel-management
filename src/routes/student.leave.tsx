@@ -3,7 +3,7 @@ import { useState } from "react";
 import { PortalShell } from "@/components/hostel/portal-shell";
 import { Card, Section } from "@/components/hostel/primitives";
 import { StatusChip, statusTone, prettyStatus } from "@/components/hostel/status-chip";
-import { currentStudent, leaveRequests as seed, type LeaveRequest } from "@/lib/hostel-data";
+import { useLeaveRequests, useCreateLeaveRequest } from "@/lib/data-layer";
 import { CalendarDays } from "lucide-react";
 
 export const Route = createFileRoute("/student/leave")({
@@ -12,19 +12,33 @@ export const Route = createFileRoute("/student/leave")({
 });
 
 function LeavePage() {
-  const [list, setList] = useState<LeaveRequest[]>(seed.filter((l) => l.student === currentStudent.name));
+  const { data: list, isLoading } = useLeaveRequests();
+  const createLeave = useCreateLeaveRequest();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [reason, setReason] = useState("");
   const [destination, setDestination] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
+  if (isLoading || !list) {
+    return (
+      <PortalShell role="student" eyebrow="Out of campus" title="Leave requests">
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading leave requests...</div>
+        </div>
+      </PortalShell>
+    );
+  }
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!from || !to || !reason) return;
-    setList((l) => [{ id: `lr-${Math.floor(Math.random() * 900 + 100)}`, student: currentStudent.name, from, to, reason, destination, status: "pending" }, ...l]);
-    setFrom(""); setTo(""); setReason(""); setDestination("");
-    setSubmitted(true); setTimeout(() => setSubmitted(false), 2200);
+    createLeave.mutate({ from, to, reason, destination }, {
+      onSuccess: () => {
+        setFrom(""); setTo(""); setReason(""); setDestination("");
+        setSubmitted(true); setTimeout(() => setSubmitted(false), 2200);
+      }
+    });
   };
 
   return (

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { PortalShell } from "@/components/hostel/portal-shell";
 import { Card, EmptyState, Section } from "@/components/hostel/primitives";
 import { StatusChip, statusTone, prettyStatus } from "@/components/hostel/status-chip";
-import { complaints as seed, currentStudent, type Complaint } from "@/lib/hostel-data";
+import { useComplaints, useCreateComplaint } from "@/lib/data-layer";
 import { Plus, Wrench, X } from "lucide-react";
 
 export const Route = createFileRoute("/student/complaints")({
@@ -12,9 +12,20 @@ export const Route = createFileRoute("/student/complaints")({
 });
 
 function ComplaintsPage() {
-  const [list, setList] = useState<Complaint[]>(seed.filter((c) => c.submittedBy === currentStudent.name));
+  const { data: list, isLoading } = useComplaints();
+  const createComplaint = useCreateComplaint();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+
+  if (isLoading || !list) {
+    return (
+      <PortalShell role="student" eyebrow="Maintenance" title="Your complaints">
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading complaints...</div>
+        </div>
+      </PortalShell>
+    );
+  }
 
   const filtered = list.filter((c) => (q ? (c.title + c.category).toLowerCase().includes(q.toLowerCase()) : true));
 
@@ -80,15 +91,30 @@ function ComplaintsPage() {
         </div>
       </Section>
 
-      {open && <NewComplaintModal onClose={() => setOpen(false)} onSubmit={(c) => { setList((l) => [c, ...l]); setOpen(false); }} />}
+      {open && (
+        <NewComplaintModal
+          onClose={() => setOpen(false)}
+          onSubmit={(newC) => {
+            createComplaint.mutate(newC, {
+              onSuccess: () => setOpen(false),
+            });
+          }}
+        />
+      )}
     </PortalShell>
   );
 }
 
-function NewComplaintModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (c: Complaint) => void }) {
+function NewComplaintModal({
+  onClose,
+  onSubmit,
+}: {
+  onClose: () => void;
+  onSubmit: (c: { title: string; category: string; priority: string; description: string }) => void;
+}) {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Plumbing");
-  const [priority, setPriority] = useState<Complaint["priority"]>("medium");
+  const [priority, setPriority] = useState("medium");
   const [description, setDescription] = useState("");
 
   return (
@@ -107,13 +133,7 @@ function NewComplaintModal({ onClose, onSubmit }: { onClose: () => void; onSubmi
           onSubmit={(e) => {
             e.preventDefault();
             if (!title.trim()) return;
-            onSubmit({
-              id: `c-${Math.floor(Math.random() * 9000 + 1000)}`,
-              title, category, priority, status: "open",
-              createdAt: new Date().toISOString().slice(0, 10),
-              updatedAt: new Date().toISOString().slice(0, 10),
-              submittedBy: currentStudent.name, description,
-            });
+            onSubmit({ title, category, priority, description });
           }}
         >
           <Field label="Title">

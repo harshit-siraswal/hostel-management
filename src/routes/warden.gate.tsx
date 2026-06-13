@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PortalShell } from "@/components/hostel/portal-shell";
 import { Card, Section } from "@/components/hostel/primitives";
 import { StatusChip, statusTone, prettyStatus } from "@/components/hostel/status-chip";
-import { gateEvents } from "@/lib/hostel-data";
+import { useGateEvents } from "@/lib/data-layer";
 import { ShieldAlert, ShieldCheck, ShieldX } from "lucide-react";
 
 export const Route = createFileRoute("/warden/gate")({
@@ -18,6 +18,18 @@ const STATES = [
 ];
 
 function GateAIPage() {
+  const { data: gateEvents, isLoading } = useGateEvents();
+
+  if (isLoading || !gateEvents) {
+    return (
+      <PortalShell role="warden" eyebrow="Identity" title="Gate & AI verification">
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading gate events...</div>
+        </div>
+      </PortalShell>
+    );
+  }
+
   return (
     <PortalShell role="warden" eyebrow="Identity" title="Gate & AI verification">
       <Section title="Verification states">

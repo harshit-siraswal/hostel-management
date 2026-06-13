@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PortalShell } from "@/components/hostel/portal-shell";
 import { Card } from "@/components/hostel/primitives";
 import { StatusChip } from "@/components/hostel/status-chip";
-import { rooms } from "@/lib/hostel-data";
+import { useRooms } from "@/lib/data-layer";
 
 export const Route = createFileRoute("/warden/rooms")({
   head: () => ({ meta: [{ title: "Warden · Rooms" }] }),
@@ -10,6 +10,18 @@ export const Route = createFileRoute("/warden/rooms")({
 });
 
 function RoomsPage() {
+  const { data: rooms, isLoading } = useRooms();
+
+  if (isLoading || !rooms) {
+    return (
+      <PortalShell role="warden" eyebrow="Allocation" title="Rooms & occupancy">
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading rooms...</div>
+        </div>
+      </PortalShell>
+    );
+  }
+
   const blocks = Array.from(new Set(rooms.map((r) => r.block)));
   return (
     <PortalShell role="warden" eyebrow="Allocation" title="Rooms & occupancy">

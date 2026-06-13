@@ -3,7 +3,7 @@ import { useState } from "react";
 import { PortalShell } from "@/components/hostel/portal-shell";
 import { Card } from "@/components/hostel/primitives";
 import { StatusChip, statusTone, prettyStatus } from "@/components/hostel/status-chip";
-import { complaints } from "@/lib/hostel-data";
+import { useComplaints } from "@/lib/data-layer";
 
 export const Route = createFileRoute("/warden/complaints")({
   head: () => ({ meta: [{ title: "Warden · Complaints" }] }),
@@ -18,7 +18,19 @@ const COLUMNS: Array<{ id: string; label: string }> = [
 ];
 
 function WardenComplaints() {
+  const { data: complaints, isLoading } = useComplaints();
   const [filter, setFilter] = useState<string>("all");
+
+  if (isLoading || !complaints) {
+    return (
+      <PortalShell role="warden" eyebrow="Maintenance" title="Complaints board">
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading complaints...</div>
+        </div>
+      </PortalShell>
+    );
+  }
+
   const filtered = complaints.filter((c) => (filter === "all" ? true : c.priority === filter));
 
   return (

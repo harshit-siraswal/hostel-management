@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, useRouterState, Link } from "@tanstack/react-r
 import { PortalShell } from "@/components/hostel/portal-shell";
 import { KpiCard } from "@/components/hostel/kpi-card";
 import { Card, Section } from "@/components/hostel/primitives";
-import { kpis } from "@/lib/hostel-data";
+import { useKpis } from "@/lib/data-layer";
 import { ArrowRight, Download } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -30,6 +30,22 @@ function Bars({ values, tone = "amber" }: { values: number[]; tone?: "amber" | "
 }
 
 function AdminDashboard() {
+  const { data: kpisData, isLoading } = useKpis("admin");
+
+  if (isLoading || !kpisData) {
+    return (
+      <PortalShell
+        role="admin"
+        eyebrow="Institution · Cycle Jun 2026"
+        title="Control dashboard"
+      >
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading admin dashboard data...</div>
+        </div>
+      </PortalShell>
+    );
+  }
+
   return (
     <PortalShell
       role="admin"
@@ -42,7 +58,7 @@ function AdminDashboard() {
       }
     >
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {kpis.admin.map((k) => <KpiCard key={k.label} {...k} />)}
+        {kpisData.map((k) => <KpiCard key={k.label} {...k} />)}
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-3">

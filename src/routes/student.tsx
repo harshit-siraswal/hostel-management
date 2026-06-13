@@ -3,7 +3,15 @@ import { PortalShell } from "@/components/hostel/portal-shell";
 import { KpiCard } from "@/components/hostel/kpi-card";
 import { Card, Section } from "@/components/hostel/primitives";
 import { StatusChip, statusTone, prettyStatus } from "@/components/hostel/status-chip";
-import { bills, complaints, currentStudent, kpis, leaveRequests, notices, visitors } from "@/lib/hostel-data";
+import {
+  useCurrentStudent,
+  useBills,
+  useComplaints,
+  useLeaveRequests,
+  useVisitors,
+  useNotices,
+  useKpis,
+} from "@/lib/data-layer";
 import { ArrowRight, BedDouble, BellRing, Plus, Receipt } from "lucide-react";
 
 export const Route = createFileRoute("/student")({
@@ -18,6 +26,39 @@ function StudentLayout() {
 }
 
 function StudentOverview() {
+  const { data: currentStudent, isLoading: sLoading } = useCurrentStudent();
+  const { data: bills, isLoading: bLoading } = useBills();
+  const { data: complaints, isLoading: cLoading } = useComplaints();
+  const { data: leaveRequests, isLoading: lLoading } = useLeaveRequests();
+  const { data: visitors, isLoading: vLoading } = useVisitors();
+  const { data: notices, isLoading: nLoading } = useNotices();
+  const { data: kpisData, isLoading: kLoading } = useKpis("student");
+
+  if (
+    sLoading ||
+    bLoading ||
+    cLoading ||
+    lLoading ||
+    vLoading ||
+    nLoading ||
+    kLoading ||
+    !currentStudent ||
+    !bills ||
+    !complaints ||
+    !leaveRequests ||
+    !visitors ||
+    !notices ||
+    !kpisData
+  ) {
+    return (
+      <PortalShell role="student" eyebrow="..." title="Loading ledger...">
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading ledger data...</div>
+        </div>
+      </PortalShell>
+    );
+  }
+
   const leave = leaveRequests.find((l) => l.student === currentStudent.name);
   const openComplaints = complaints.filter((c) => c.submittedBy === currentStudent.name && c.status !== "resolved" && c.status !== "closed");
   const visitor = visitors.find((v) => v.host === currentStudent.name);
@@ -35,7 +76,7 @@ function StudentOverview() {
       }
     >
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {kpis.student.map((k) => <KpiCard key={k.label} {...k} />)}
+        {kpisData.map((k) => <KpiCard key={k.label} {...k} />)}
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-3">

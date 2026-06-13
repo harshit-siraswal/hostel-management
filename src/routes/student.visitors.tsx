@@ -2,9 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { PortalShell } from "@/components/hostel/portal-shell";
 import { Card, Section } from "@/components/hostel/primitives";
+import { VisitorQr } from "@/components/hostel/visitor-qr";
 import { StatusChip, statusTone, prettyStatus } from "@/components/hostel/status-chip";
-import { currentStudent, visitors as seed, type VisitorRequest } from "@/lib/hostel-data";
-import { QrCode, UserPlus } from "lucide-react";
+import { useVisitors, useCreateVisitorRequest } from "@/lib/data-layer";
+import { UserPlus } from "lucide-react";
 
 export const Route = createFileRoute("/student/visitors")({
   head: () => ({ meta: [{ title: "Visitors — Bunkhaus" }] }),
@@ -12,21 +13,31 @@ export const Route = createFileRoute("/student/visitors")({
 });
 
 function VisitorsPage() {
-  const [list, setList] = useState<VisitorRequest[]>(seed);
+  const { data: list, isLoading } = useVisitors();
+  const createVisitor = useCreateVisitorRequest();
   const [name, setName] = useState("");
   const [relation, setRelation] = useState("Parent");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
+  if (isLoading || !list) {
+    return (
+      <PortalShell role="student" eyebrow="Gate" title="Visitor passes">
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading visitor passes...</div>
+        </div>
+      </PortalShell>
+    );
+  }
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !from || !to) return;
-    setList((l) => [{
-      id: `v-${Math.floor(Math.random() * 900 + 100)}`,
-      visitor: name, relation, host: currentStudent.name, hostRoom: currentStudent.room,
-      validFrom: from, validTo: to, status: "pending",
-    }, ...l]);
-    setName(""); setFrom(""); setTo("");
+    createVisitor.mutate({ visitorName: name, relation, validFrom: from, validTo: to }, {
+      onSuccess: () => {
+        setName(""); setFrom(""); setTo("");
+      }
+    });
   };
 
   return (
@@ -71,9 +82,11 @@ function VisitorsPage() {
                   </div>
                   <div className="flex flex-col items-end gap-3">
                     <StatusChip label={prettyStatus(v.status)} tone={statusTone(v.status)} />
-                    <div className="grid h-16 w-16 place-items-center rounded-md border border-border bg-background/60">
-                      <QrCode className="h-8 w-8 text-amber" />
-                    </div>
+                    <VisitorQr
+                      visitor={v}
+                      size={72}
+                      caption={v.status === "approved" ? "QR ready" : "QR preview"}
+                    />
                   </div>
                 </div>
               </Card>
