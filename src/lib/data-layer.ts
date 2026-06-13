@@ -34,33 +34,29 @@ export function useCurrentStudent() {
   return useQuery({
     queryKey: ["currentStudent", session?.email],
     queryFn: async () => {
-      if (!session) return seed.currentStudent;
+      if (!session) throw new Error("No session active.");
       if (session.provider === "demo") {
         return seed.currentStudent;
       }
-      try {
-        const students = await api<any[]>("/api/v1/students", []);
-        const current = students.find(
-          (s) => s.email?.toLowerCase() === session.email?.toLowerCase()
-        );
-        if (current) {
-          return {
-            id: current.id,
-            name: current.name,
-            roll: current.rollNumber || "STU-001",
-            hostel: current.block || "Block C — Tagore",
-            room: current.roomNumber || "C-214",
-            bed: current.bed || "B2",
-            course: current.department || "B.Tech CSE",
-            year: current.academic_year || 3,
-          } as Student;
-        }
-      } catch (e) {
-        console.error("Error fetching student profile from backend", e);
+      const students = await api<any[]>("/api/v1/students", []);
+      const current = students.find(
+        (s) => s.email?.toLowerCase() === session.email?.toLowerCase()
+      );
+      if (!current) {
+        throw new Error(`Student profile with email ${session.email} not found.`);
       }
-      return seed.currentStudent;
+      return {
+        id: current.id,
+        name: current.name,
+        roll: current.rollNumber || "STU-001",
+        hostel: current.block || "Block C — Tagore",
+        room: current.roomNumber || "C-214",
+        bed: current.bed || "B2",
+        course: current.department || "B.Tech CSE",
+        year: current.academic_year || 3,
+      } as Student;
     },
-    enabled: !!session,
+    enabled: !!session && session.role === "student",
   });
 }
 
@@ -74,29 +70,21 @@ export function useBills() {
       if (isDemoMode()) {
         return getLocalItem<Bill[]>("bills", seed.bills);
       }
-      try {
-        const all = await api<any[]>("/api/v1/bills", []);
-        const studentId = student?.id;
-        const filtered = studentId ? all.filter((b) => b.studentId === studentId) : all;
-        if (filtered.length === 0) {
-          // Fallback if backend returned empty but we want some billing items
-          return seed.bills;
-        }
-        return filtered.map((b) => ({
-          id: b.id,
-          period: b.month || "Current Cycle",
-          hostelFee: b.category === "Hostel fee" ? Number(b.amount) : Number(b.amount) * 0.8,
-          electricity: b.category === "Electricity" ? Number(b.amount) : Number(b.amount) * 0.1,
-          mess: b.category === "Mess" ? Number(b.amount) : Number(b.amount) * 0.1,
-          total: Number(b.amount),
-          dueDate: b.dueDate ? b.dueDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
-          status: b.status === "paid" ? "paid" : b.status === "overdue" ? "overdue" : "due",
-        })) as Bill[];
-      } catch (e) {
-        console.error("Error fetching bills", e);
-        return seed.bills;
-      }
+      const all = await api<any[]>("/api/v1/bills", []);
+      const studentId = student?.id;
+      const filtered = studentId ? all.filter((b) => b.studentId === studentId) : all;
+      return filtered.map((b) => ({
+        id: b.id,
+        period: b.month || "Current Cycle",
+        hostelFee: b.category === "Hostel fee" ? Number(b.amount) : Number(b.amount) * 0.8,
+        electricity: b.category === "Electricity" ? Number(b.amount) : Number(b.amount) * 0.1,
+        mess: b.category === "Mess" ? Number(b.amount) : Number(b.amount) * 0.1,
+        total: Number(b.amount),
+        dueDate: b.dueDate ? b.dueDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        status: b.status === "paid" ? "paid" : b.status === "overdue" ? "overdue" : "due",
+      })) as Bill[];
     },
+    enabled: !!session && (session.role !== "student" || !!student),
   });
 }
 
@@ -110,30 +98,26 @@ export function useComplaints() {
       if (isDemoMode()) {
         return getLocalItem<Complaint[]>("complaints", seed.complaints);
       }
-      try {
-        const all = await api<any[]>("/api/v1/complaints", []);
-        let mapped = all.map((c) => ({
-          id: c.id,
-          title: c.title,
-          category: c.category,
-          priority: c.priority || "medium",
-          status: c.status || "open",
-          createdAt: c.createdAt ? c.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
-          updatedAt: c.updatedAt ? c.updatedAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
-          submittedBy: c.studentName || c.studentId || "Student",
-          description: c.description || "",
-          assignee: c.assignedTo || "Unassigned",
-        })) as Complaint[];
+      const all = await api<any[]>("/api/v1/complaints", []);
+      let mapped = all.map((c) => ({
+        id: c.id,
+        title: c.title,
+        category: c.category,
+        priority: c.priority || "medium",
+        status: c.status || "open",
+        createdAt: c.createdAt ? c.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        updatedAt: c.updatedAt ? c.updatedAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        submittedBy: c.studentName || c.studentId || "Student",
+        description: c.description || "",
+        assignee: c.assignedTo || "Unassigned",
+      })) as Complaint[];
 
-        if (session?.role === "student" && student) {
-          mapped = mapped.filter((c) => c.submittedBy === student.name);
-        }
-        return mapped;
-      } catch (e) {
-        console.error("Error fetching complaints", e);
-        return seed.complaints;
+      if (session?.role === "student" && student) {
+        mapped = mapped.filter((c) => c.submittedBy === student.name);
       }
+      return mapped;
     },
+    enabled: !!session && (session.role !== "student" || !!student),
   });
 }
 
@@ -215,27 +199,23 @@ export function useLeaveRequests() {
       if (isDemoMode()) {
         return getLocalItem<LeaveRequest[]>("leaveRequests", seed.leaveRequests);
       }
-      try {
-        const all = await api<any[]>("/api/v1/leave-requests", []);
-        let mapped = all.map((l) => ({
-          id: l.id,
-          student: l.studentName || l.studentId || "Student",
-          from: l.fromDate ? l.fromDate.slice(0, 10) : "",
-          to: l.toDate ? l.toDate.slice(0, 10) : "",
-          reason: l.reason,
-          destination: l.destination || "Home",
-          status: l.status || "pending",
-        })) as LeaveRequest[];
+      const all = await api<any[]>("/api/v1/leave-requests", []);
+      let mapped = all.map((l) => ({
+        id: l.id,
+        student: l.studentName || l.studentId || "Student",
+        from: l.fromDate ? l.fromDate.slice(0, 10) : "",
+        to: l.toDate ? l.toDate.slice(0, 10) : "",
+        reason: l.reason,
+        destination: l.destination || "Home",
+        status: l.status || "pending",
+      })) as LeaveRequest[];
 
-        if (session?.role === "student" && student) {
-          mapped = mapped.filter((l) => l.student === student.name);
-        }
-        return mapped;
-      } catch (e) {
-        console.error("Error fetching leave requests", e);
-        return seed.leaveRequests;
+      if (session?.role === "student" && student) {
+        mapped = mapped.filter((l) => l.student === student.name);
       }
+      return mapped;
     },
+    enabled: !!session && (session.role !== "student" || !!student),
   });
 }
 
@@ -306,38 +286,34 @@ export function useVisitors() {
       if (isDemoMode()) {
         return getLocalItem<VisitorRequest[]>("visitors", seed.visitors);
       }
-      try {
-        const all = await api<any[]>("/api/v1/visitor-requests", []);
-        const passes = await api<any[]>("/api/v1/gate-passes", []);
-        let mapped = all.map((v) => {
-          const pass = passes.find((p) => p.visitorId === v.id);
-          return {
-            id: v.id,
-            visitor: v.name,
-            relation: v.relation || "Visitor",
-            host: v.hostName || v.hostStudentId || "Host",
-            hostRoom: "C-214",
-            validFrom: v.requestedAt ? v.requestedAt.slice(0, 16).replace("T", " ") : "",
-            validTo: pass
-              ? pass.validUntil.slice(0, 16).replace("T", " ")
-              : new Date(new Date(v.requestedAt || Date.now()).getTime() + 8 * 3600000)
-                  .toISOString()
-                  .slice(0, 16)
-                  .replace("T", " "),
-            status: v.status || "pending",
-            passCode: pass ? pass.code : "",
-          };
-        }) as VisitorRequest[];
+      const all = await api<any[]>("/api/v1/visitor-requests", []);
+      const passes = await api<any[]>("/api/v1/gate-passes", []);
+      let mapped = all.map((v) => {
+        const pass = passes.find((p) => p.visitorId === v.id);
+        return {
+          id: v.id,
+          visitor: v.name,
+          relation: v.relation || "Visitor",
+          host: v.hostName || v.hostStudentId || "Host",
+          hostRoom: "C-214",
+          validFrom: v.requestedAt ? v.requestedAt.slice(0, 16).replace("T", " ") : "",
+          validTo: pass
+            ? pass.validUntil.slice(0, 16).replace("T", " ")
+            : new Date(new Date(v.requestedAt || Date.now()).getTime() + 8 * 3600000)
+                .toISOString()
+                .slice(0, 16)
+                .replace("T", " "),
+          status: v.status || "pending",
+          passCode: pass ? pass.code : "",
+        };
+      }) as VisitorRequest[];
 
-        if (session?.role === "student" && student) {
-          mapped = mapped.filter((v) => v.host === student.name);
-        }
-        return mapped;
-      } catch (e) {
-        console.error("Error fetching visitors", e);
-        return seed.visitors;
+      if (session?.role === "student" && student) {
+        mapped = mapped.filter((v) => v.host === student.name);
       }
+      return mapped;
     },
+    enabled: !!session && (session.role !== "student" || !!student),
   });
 }
 
@@ -381,34 +357,31 @@ export function useCreateVisitorRequest() {
 
 // 6. Rooms
 export function useRooms() {
+  const session = readAuthSession();
   return useQuery({
     queryKey: ["rooms"],
     queryFn: async () => {
       if (isDemoMode()) {
         return getLocalItem<Room[]>("rooms", seed.rooms);
       }
-      try {
-        const all = await api<any[]>("/api/v1/rooms", []);
-        return all.map((r) => ({
-          id: r.id,
-          block: r.blockName || "Block",
-          number: r.roomNumber || "000",
-          capacity: r.capacity || 2,
-          occupancy: r.occupancy || 0,
-          status:
-            r.status === "occupied"
-              ? "full"
-              : r.status === "partially-occupied"
-              ? "partial"
-              : r.status === "maintenance"
-              ? "maintenance"
-              : "available",
-        })) as Room[];
-      } catch (e) {
-        console.error("Error fetching rooms", e);
-        return seed.rooms;
-      }
+      const all = await api<any[]>("/api/v1/rooms", []);
+      return all.map((r) => ({
+        id: r.id,
+        block: r.blockName || "Block",
+        number: r.roomNumber || "000",
+        capacity: r.capacity || 2,
+        occupancy: r.occupancy || 0,
+        status:
+          r.status === "occupied"
+            ? "full"
+            : r.status === "partially-occupied"
+            ? "partial"
+            : r.status === "maintenance"
+            ? "maintenance"
+            : "available",
+      })) as Room[];
     },
+    enabled: !!session,
   });
 }
 
@@ -424,31 +397,28 @@ export function useNotices() {
 
 // 8. Gate Events / Logs
 export function useGateEvents() {
+  const session = readAuthSession();
   return useQuery({
     queryKey: ["gateEvents"],
     queryFn: async () => {
       if (isDemoMode()) {
         return getLocalItem<GateEvent[]>("gateEvents", seed.gateEvents);
       }
-      try {
-        const passes = await api<any[]>("/api/v1/gate-passes", []);
-        return passes.map((gp) => ({
-          id: gp.id,
-          name: gp.visitorName || `Visitor Pass ${gp.code}`,
-          direction: gp.exitTime ? "out" : "in",
-          time: new Date(gp.entryTime || gp.issuedAt).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-          }),
-          verification: gp.verifiedBy ? "matched" : "manual_review",
-          confidence: 0.95,
-        })) as GateEvent[];
-      } catch (e) {
-        console.error("Error fetching gate events", e);
-        return seed.gateEvents;
-      }
+      const passes = await api<any[]>("/api/v1/gate-passes", []);
+      return passes.map((gp) => ({
+        id: gp.id,
+        name: gp.visitorName || `Visitor Pass ${gp.code}`,
+        direction: gp.exitTime ? "out" : "in",
+        time: new Date(gp.entryTime || gp.issuedAt).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }),
+        verification: gp.verifiedBy ? "matched" : "manual_review",
+        confidence: 0.95,
+      })) as GateEvent[];
     },
+    enabled: !!session,
   });
 }
 

@@ -4,7 +4,7 @@ import type { Role } from "@/lib/hostel-data";
 import { ArrowRight, Building2, ShieldCheck, Users, Briefcase, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearAuthSession, saveAuthSession } from "@/lib/auth";
-import { hasFirebaseConfig, signInWithFirebaseCredentials } from "@/lib/firebase";
+import { hasFirebaseConfig, signInWithFirebaseCredentials, signInWithGoogle } from "@/lib/firebase";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — Bunkhaus" }] }),
@@ -37,24 +37,47 @@ function LoginPage() {
     }
     setLoading(true);
 
+    const isDemoCredentials = email.trim().toLowerCase() === selectedDemo.toLowerCase() && password === "demo1234";
+
     try {
-      if (hasFirebaseConfig()) {
-        await signInWithFirebaseCredentials(email, password, role);
-        navigate({ to: `/${role}` });
+      if (isDemoCredentials) {
+        clearAuthSession();
+        saveAuthSession({
+          provider: "demo",
+          role,
+          email: email.trim().toLowerCase(),
+          token: `demo:${role}`,
+        });
+        setTimeout(() => navigate({ to: `/${role}` }), 450);
         return;
       }
 
-      clearAuthSession();
-      saveAuthSession({
-        provider: "demo",
-        role,
-        email,
-        token: `demo:${role}`,
-      });
+      // If not demo credentials, must authenticate with Firebase
+      if (!hasFirebaseConfig()) {
+        throw new Error("Firebase configuration is missing. Real mode authentication is not available in this environment.");
+      }
 
-      setTimeout(() => navigate({ to: `/${role}` }), 450);
+      await signInWithFirebaseCredentials(email.trim(), password, role);
+      navigate({ to: `/${role}` });
     } catch (authError) {
       const message = authError instanceof Error ? authError.message : "Unable to sign in right now.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      if (!hasFirebaseConfig()) {
+        throw new Error("Firebase configuration is missing. Google Sign-In is not available in this environment.");
+      }
+      await signInWithGoogle(role);
+      navigate({ to: `/${role}` });
+    } catch (authError) {
+      const message = authError instanceof Error ? authError.message : "Google Sign-In failed.";
       setError(message);
     } finally {
       setLoading(false);
@@ -109,7 +132,7 @@ function LoginPage() {
           <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-amber">Sign in</div>
           <h2 className="mt-1 font-display text-3xl">Choose your portal</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Backend not wired? The prototype routes you straight to the dashboard.
+            Select a portal and enter credentials to sign in.
           </p>
 
           <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -168,6 +191,29 @@ function LoginPage() {
               className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber px-4 py-3 text-sm font-semibold text-amber-foreground transition hover:brightness-110 disabled:opacity-60"
             >
               {loading ? "Signing in…" : <>Enter portal <ArrowRight className="h-4 w-4" /></>}
+            </button>
+
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-border"></div>
+              <span className="flex-shrink mx-4 text-xs uppercase tracking-wider text-muted-foreground">or</span>
+              <div className="flex-grow border-t border-border"></div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-border bg-card/50 hover:bg-card px-4 py-3 text-sm font-semibold text-foreground transition hover:border-foreground/30 disabled:opacity-60"
+            >
+              <svg className="h-4 w-4 mr-1" viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+                <g transform="matrix(1, 0, 0, 1, 0, 0)">
+                  <path d="M21.35,11.1H12v2.7h5.38c-0.24,1.28 -0.96,2.37 -2.04,3.1v2.6h3.3c1.93,-1.78 3.04,-4.4 3.04,-7.4C21.68,11.77 21.56,11.41 21.35,11.1z" fill="#4285F4" />
+                  <path d="M12,20.62c2.43,0 4.47,-0.8 5.96,-2.18l-3.3,-2.6c-0.91,0.61 -2.08,0.98 -3.3,0.98 -2.34,0 -4.33,-1.58 -5.04,-3.71H2.9v2.6C4.38,18.67 7.94,20.62 12,20.62z" fill="#34A853" />
+                  <path d="M6.96,13.11c-0.18,-0.55 -0.28,-1.13 -0.28,-1.73s0.1,-1.18 0.28,-1.73V7.05H2.9C2.29,8.27 1.95,9.66 1.95,11.14s0.34,2.87 0.95,4.09l4.06,-3.12z" fill="#FBBC05" />
+                  <path d="M12,4.88c1.32,0 2.51,0.45 3.44,1.35l2.58,-2.58C16.46,2.2 14.42,1.38 12,1.38 7.94,1.38 4.38,3.33 2.9,6.33l4.06,3.12C7.67,6.46 9.66,4.88 12,4.88z" fill="#EA4335" />
+                </g>
+              </svg>
+              Sign in with Google
             </button>
 
             <div className="hairline pt-2" />

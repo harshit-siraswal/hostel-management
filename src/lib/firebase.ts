@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 
 import { saveAuthSession } from "./auth";
 import type { Role } from "./hostel-data";
@@ -58,6 +58,29 @@ export async function signInWithFirebaseCredentials(email: string, password: str
     provider: "firebase",
     role,
     email: result.user.email || email,
+    token,
+    uid: result.user.uid,
+    displayName: result.user.displayName,
+  });
+
+  return result.user;
+}
+
+export async function signInWithGoogle(role: Role) {
+  const app = getFirebaseApp();
+  if (!app) {
+    throw new Error("Firebase is not configured in this environment.");
+  }
+
+  const auth = getAuth(app);
+  const provider = new GoogleAuthProvider();
+  const result = await signInWithPopup(auth, provider);
+  const token = await result.user.getIdToken();
+
+  saveAuthSession({
+    provider: "firebase",
+    role,
+    email: result.user.email || "",
     token,
     uid: result.user.uid,
     displayName: result.user.displayName,

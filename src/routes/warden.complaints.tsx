@@ -3,7 +3,7 @@ import { useState } from "react";
 import { PortalShell } from "@/components/hostel/portal-shell";
 import { Card } from "@/components/hostel/primitives";
 import { StatusChip, statusTone, prettyStatus } from "@/components/hostel/status-chip";
-import { useComplaints } from "@/lib/data-layer";
+import { useComplaints, useUpdateComplaint } from "@/lib/data-layer";
 
 export const Route = createFileRoute("/warden/complaints")({
   head: () => ({ meta: [{ title: "Warden · Complaints" }] }),
@@ -15,10 +15,12 @@ const COLUMNS: Array<{ id: string; label: string }> = [
   { id: "assigned", label: "Assigned" },
   { id: "in_progress", label: "In Progress" },
   { id: "resolved", label: "Resolved" },
+  { id: "closed", label: "Closed" },
 ];
 
 function WardenComplaints() {
   const { data: complaints, isLoading } = useComplaints();
+  const updateComplaint = useUpdateComplaint();
   const [filter, setFilter] = useState<string>("all");
 
   if (isLoading || !complaints) {
@@ -49,7 +51,7 @@ function WardenComplaints() {
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {COLUMNS.map((col) => {
           const items = filtered.filter((c) => c.status === col.id);
           return (
@@ -60,17 +62,86 @@ function WardenComplaints() {
               </div>
               <div className="space-y-3">
                 {items.map((c) => (
-                  <Card key={c.id} className="!p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="font-mono text-[10px] text-muted-foreground tabular">{c.id}</div>
-                      <StatusChip label={c.priority} tone={c.priority === "urgent" || c.priority === "high" ? "danger" : "warning"} />
+                  <Card key={c.id} className="!p-4 flex flex-col justify-between min-h-[160px]">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <div className="font-mono text-[10px] text-muted-foreground tabular">{c.id}</div>
+                        <StatusChip label={c.priority} tone={c.priority === "urgent" || c.priority === "high" ? "danger" : "warning"} />
+                      </div>
+                      <div className="mt-2 font-medium leading-snug">{c.title}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{c.category} · {c.submittedBy}</div>
+                      {c.description ? (
+                        <div className="mt-2 text-[11px] text-muted-foreground line-clamp-2" title={c.description}>
+                          {c.description}
+                        </div>
+                      ) : null}
                     </div>
-                    <div className="mt-2 font-medium leading-snug">{c.title}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{c.category} · {c.submittedBy}</div>
-                    <div className="hairline my-3" />
-                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                      <span>{c.assignee || "Unassigned"}</span>
-                      <span className="font-mono tabular">{c.updatedAt}</span>
+                    <div>
+                      <div className="hairline my-3" />
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                        <span>{c.assignee || "Unassigned"}</span>
+                        <span className="font-mono tabular">{c.updatedAt}</span>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="mt-3 flex flex-wrap gap-1 border-t border-border/40 pt-2.5">
+                        {c.status === "open" && (
+                          <>
+                            <button
+                              onClick={() => updateComplaint.mutate({ id: c.id, status: "assigned", assignee: "Warden staff" })}
+                              className="rounded bg-amber/10 hover:bg-amber/20 px-2 py-1 text-[10px] font-semibold text-amber transition cursor-pointer"
+                            >
+                              Assign
+                            </button>
+                            <button
+                              onClick={() => updateComplaint.mutate({ id: c.id, status: "resolved" })}
+                              className="rounded bg-[color:var(--success)]/10 hover:bg-[color:var(--success)]/20 px-2 py-1 text-[10px] font-semibold text-[color:var(--success)] transition cursor-pointer"
+                            >
+                              Resolve
+                            </button>
+                          </>
+                        )}
+                        {c.status === "assigned" && (
+                          <>
+                            <button
+                              onClick={() => updateComplaint.mutate({ id: c.id, status: "in_progress" })}
+                              className="rounded bg-blue-500/10 hover:bg-blue-500/20 px-2 py-1 text-[10px] font-semibold text-blue-400 transition cursor-pointer"
+                            >
+                              Start
+                            </button>
+                            <button
+                              onClick={() => updateComplaint.mutate({ id: c.id, status: "resolved" })}
+                              className="rounded bg-[color:var(--success)]/10 hover:bg-[color:var(--success)]/20 px-2 py-1 text-[10px] font-semibold text-[color:var(--success)] transition cursor-pointer"
+                            >
+                              Resolve
+                            </button>
+                          </>
+                        )}
+                        {c.status === "in_progress" && (
+                          <button
+                            onClick={() => updateComplaint.mutate({ id: c.id, status: "resolved" })}
+                            className="rounded bg-[color:var(--success)]/10 hover:bg-[color:var(--success)]/20 px-2 py-1 text-[10px] font-semibold text-[color:var(--success)] transition cursor-pointer"
+                          >
+                            Mark Done
+                          </button>
+                        )}
+                        {c.status === "resolved" && (
+                          <button
+                            onClick={() => updateComplaint.mutate({ id: c.id, status: "closed" })}
+                            className="rounded bg-gray-500/15 hover:bg-gray-500/25 px-2 py-1 text-[10px] font-semibold text-muted-foreground transition cursor-pointer"
+                          >
+                            Close
+                          </button>
+                        )}
+                        {c.status === "closed" && (
+                          <button
+                            onClick={() => updateComplaint.mutate({ id: c.id, status: "open" })}
+                            className="rounded bg-amber/10 hover:bg-amber/20 px-2 py-1 text-[10px] font-semibold text-amber transition cursor-pointer"
+                          >
+                            Reopen
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </Card>
                 ))}

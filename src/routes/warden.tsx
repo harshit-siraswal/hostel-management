@@ -9,6 +9,7 @@ import {
   useGateEvents,
   useDecideLeaveRequest,
   useKpis,
+  useUpdateComplaint,
 } from "@/lib/data-layer";
 import { AlertTriangle, ArrowRight, ShieldAlert } from "lucide-react";
 
@@ -29,6 +30,7 @@ function WardenDashboard() {
   const { data: gateEvents, isLoading: gLoading } = useGateEvents();
   const { data: kpisData, isLoading: kLoading } = useKpis("warden");
   const decideLeave = useDecideLeaveRequest();
+  const updateComplaint = useUpdateComplaint();
 
   if (
     cLoading ||
@@ -58,7 +60,7 @@ function WardenDashboard() {
         {kpisData.map((k) => <KpiCard key={k.label} {...k} />)}
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-3">
+      <div className="ledger-grid mt-8 grid gap-6 lg:grid-cols-3">
         <Section title="Urgent queue" className="lg:col-span-2">
           <Card className="!p-0">
             <ul className="divide-y divide-border">
@@ -70,9 +72,25 @@ function WardenDashboard() {
                     <div className="text-xs text-muted-foreground">{c.category} · {c.submittedBy}</div>
                   </div>
                   <div className="hidden text-xs text-muted-foreground sm:block">{c.assignee || "Unassigned"}</div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
                     <StatusChip label={c.priority} tone="danger" />
                     <StatusChip label={prettyStatus(c.status)} tone={statusTone(c.status)} />
+                    {c.status !== "resolved" && c.status !== "closed" && (
+                      <button
+                        onClick={() => updateComplaint.mutate({ id: c.id, status: "resolved" })}
+                        className="rounded bg-[color:var(--success)]/10 hover:bg-[color:var(--success)]/20 px-2 py-1 text-xs font-semibold text-[color:var(--success)] transition cursor-pointer"
+                      >
+                        Resolve
+                      </button>
+                    )}
+                    {c.status === "resolved" && (
+                      <button
+                        onClick={() => updateComplaint.mutate({ id: c.id, status: "closed" })}
+                        className="rounded bg-gray-500/15 hover:bg-gray-500/25 px-2 py-1 text-xs font-semibold text-muted-foreground transition cursor-pointer"
+                      >
+                        Close
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}
